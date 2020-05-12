@@ -12,54 +12,9 @@ library(pwr)
 library(ggplot2)
 library(ggpubr)
 ```
-```{r power analyses}
-pwr.anova.test(k = 4, f = 0.25, sig.level = NULL, power = )
 
-```
 
-```{r write morph csv, include=FALSE}
-
-#Creating CSV file from the text files from software
-rawmorph<-data.frame()
-blist<-list.files("DietExp1 Morph Data")
-for(d in 1:length(blist))
-{
-  d.name<-paste("./DietExp1 Morph Data/",blist[d],sep="")
-  f<-list.files(d.name)
-  if(length(f) != 4) print(paste("Missing File in",d.name))
-  for(i in 1:length(f))
-  {
-    f.name<-paste(d.name,f[i],sep="/")
-    
-    rawmorph<-rbind(rawmorph,cbind(Specimen=blist[d],
-                                 Wing=strsplit(strsplit(f[i],split=" ")[[1]][2],split=".",fixed=TRUE)[[1]][1],
-                                 read.delim(f.name)))
-  }
-}
-write.csv(rawmorph,file="dietmorphraw.csv",row.names =FALSE)
-```
-
-```{r select/summarize}
-rm(list=ls())
-dietmorphraw<-read_csv("dietmorphraw.csv")
-wingmorph<-dietmorphraw %>% select(specimen="Specimen",wing="Wing",area="Area.cm.2.",length="Length.cm.",breadth="Breadth.cm.",roundness="Roundness",asp.ratio="Aspect.Ratio") 
-
-write.csv(wingmorph, file="morphclean.csv", row.names=FALSE) #contains only selected morph variables
-#I added infection status, sex, and separated specimen (#) from diet (N or T) manually in excel
-```
-
-```{r averaging wing measures}
-
-dietmorph <- read.csv("morphclean.csv")
-
-#****NEED TO STRING SPLIT SPECIMEN ID****
-#need to add sex... maybe to dietmorphraw.csv
-
-#removing duplicates (I scanned the data manually and selected by observation)
-dietmorph <- slice(dietmorph, -c(1,3,71,104,157))
-```
-
-```{r START HERE FOR NOW}
+```{r cleaning data}
 dietmorph <- read.csv("morphclean.csv")
 
 #averaging area for hindwings and forewings; calculating area asymmetry
