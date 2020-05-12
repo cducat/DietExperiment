@@ -108,13 +108,19 @@ totaldata1$Dead <- NULL
 #Individual development rates
 ggplot(data=ddata.tidy %>% filter(LarvID==17),aes(x=date,y=stage))+geom_point()+geom_smooth(aes(y=as.numeric(stage)),method="lm",se=FALSE) 
 
+ggplot(data=ddata.tidy,aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
+  geom_smooth(aes(y=stage),se=TRUE) 
 
+ggplot(data=ddata.tidy %>% filter(stage == "Ins5" | stage== "PupDate"),aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
+  geom_smooth(aes(y=stage),method="lm",se=TRUE) 
 
+summary(ddata.tidy$stage)
 #HELP
 compare_means(fore.area ~ diet, data=dietmorph2)
 my_comparisons <- list(c("N", "T"))
 
-
+ggplot(data=ddata %>% group_by(Diet) %>% summarize(avDR=mean(overall_DR))) +
+  geom_segment()
 
 N_avgODR <- ddata %>%
   filter(diet=="N") %>%
