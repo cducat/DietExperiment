@@ -37,6 +37,7 @@ hatchToIns5_DR<-c()
 numDaysHatchToIns5<-c()
 pupation<-c()
 critical_period<-c()
+numDaysHatchtoPup <- c()
 
 for(i in 1:length(larvae_ids))
 {
@@ -54,42 +55,61 @@ for(i in 1:length(larvae_ids))
   
   #Period from 5th instar to pupa
   critical_period[i]<-larvaData$date[larvaData$stage=="PupDate"]-larvaData$date[larvaData$stage=="Ins5"]
+  
+  #Hatch through pupation
+  numDaysHatchtoPup[i] <- larvaData$date[larvaData$stage=="PupDate"]-larvaData$date[larvaData$stage=="HatchDate"]
 }
 
-df<-data.frame(LarvID=larvae_ids,overall_DR=overall_DR,hatchToIns5_DR=hatchToIns5_DR,numDaysHatchToIns5=numDaysHatchToIns5,critical_period=critical_period)
+df<-data.frame(LarvID=larvae_ids,overall_DR=overall_DR,hatchToIns5_DR=hatchToIns5_DR,numDaysHatchToIns5=numDaysHatchToIns5,critical_period=critical_period, numDaysHatchtoPup=numDaysHatchtoPup)
 
 #put back into original data, remove comments column
 ddata<-left_join(ddata,df,by="LarvID")
 ```
 
-```{r}
+```{r regressing development metrics against predictor variables}
 
 summary(lm(overall_DR~Diet+Sex+Infection,data=ddata))
 summary(lm(hatchToIns5_DR~Diet+Sex+Infection,data=ddata))
 summary(lm(numDaysHatchToIns5~Diet+Sex+Infection, data=ddata))
 summary(lm(pupation~Diet+Sex+Infection,data=ddata))
 summary(lm(numDaysHatchToEclose~Diet+Sex+Infection, data=ddata))
-summary(lm(critical_period~Diet+Sex+Infection, data=ddata))
-
-
-compare_means(fore.area ~ dit, data=dietmorph2)
-my_comparisons <- list(c("N", "T"))
+summary(lm(critical_period~Diet+Sex+Infection, data=ddata))  #This is where diet is the most significant
+summary(lm(numDaysHatchtoPup~Diet+Sex+Infection, data=ddata))
 
 ```
 
-```{r Merging data frames for regressions}
+```{r Merging data frames for further regressions}
 
 #change column name from 'LarvID' to 'specimen' in 'df' dataframe in order to merge dataframes by specimen
 names(ddata)[names(ddata)=="LarvID"] <- "specimen"
-
-#Merge dataframes -- morph and color with development rate
-jointdata <- merge(ddata, dietmorph2, by="specimen")
-
 names(dietcolor1)[names(dietcolor1)=="Specimen"] <- "specimen"
-totaldata <- merge(jointdata, dietcolor1, by="specimen")
+#Merge dataframes -- morph and color with development rate
+totaldata <- merge(dietmorph2,dietcolor1, by="specimen")
+totaldata1 <- merge(totaldata,ddata, by="specimen")
+
+#Removing duplicate or unnecessary columns
+totaldata1$Diet.x <- NULL
+totaldata1$Diet.y <- NULL
+totaldata1$Sex.x <- NULL
+totaldata1$Sex.y <- NULL
+totaldata1$FamLine <- NULL
+totaldata1$Famline <- NULL
+totaldata1$Infection.x <- NULL
+totaldata1$Infection.y <- NULL
+totaldata1$X <- NULL
+totaldata1$Dead <- NULL
+
+
+#This file contains all relevant morphological, pigmentation, and development data
 ```
 
 ```{r average development plots} 
+
+#Individual development rates
+ggplot(data=ddata.tidy %>% filter(LarvID==17),aes(x=date,y=stage))+geom_point()+geom_smooth(aes(y=as.numeric(stage)),method="lm",se=FALSE) 
+
+
+
 #HELP
 compare_means(fore.area ~ diet, data=dietmorph2)
 my_comparisons <- list(c("N", "T"))
@@ -104,6 +124,7 @@ N_avgODR <- ddata %>%
 plot <- ggplot(ddata, aes(x=date, y=stage) +
   geom_line(stat="smooth", method="lm")) +
   compare_means()
+?compare_means
 
 
  
@@ -111,11 +132,8 @@ plot <- ggplot(ddata, aes(x=date, y=stage) +
 
 ```
 
-```{r development rate plots}
-#Individual development rates
-ggplot(data=ddata.tidy %>% filter(LarvID==17),aes(x=date,y=stage))+geom_point()+geom_smooth(aes(y=as.numeric(stage)),method="lm",se=FALSE) 
+```{r development rate regression plots}
 
-#filter N, 
 
 #Plots for host plant species v. overall development rate/days to development
 overall_DR.plot <- ggboxplot(ddata, x="Diet", y="overall_DR", fill="lightblue") +
@@ -139,13 +157,23 @@ print(overall_days.plot)
 
 ```{r development/morph regressions}
 
-d1 <- gls(fore.area~overall_DR.x, data=totaldata)
-d1aov <- aov(d1, type="marginal", data=totaldata)
+#USE TOTALDATA1 DATA FILE
+d1 <- gls(fore.area~overall_DR, data=totaldata1)
+d1aov <- aov(d1, type="marginal", data=totaldata1)
 anova(d1aov)
 
-d1plot <- ggplot(totaldata, aes(x=overall_DR.x, y=fore.area)) +
+d1plot <- ggplot(totaldata1, aes(x=overall_DR, y=fore.area)) +
   geom_smooth(method="lm") 
+print(d1plot)
 
-d1plot
+d2 <- gls(hind.area~overall_DR, data=totaldata1)
+d2aov <- aov(d2, type="marginal", data=totaldata1)
+anova(d2aov)
+
+d2plot <-ggplot(totaldata1, aes(x=overall_DR, y=hind.area)) +
+  geom_smooth(method="lm") 
+print(d2plot)
+
+
 ```
 
