@@ -139,6 +139,8 @@ totaldata1$Infection.y <- NULL
 totaldata1$X <- NULL
 totaldata1$Dead <- NULL
 
+totaldata1_pivot<-totaldata1 %>% pivot_longer(c("hatch_ins2....hatch_ins2","ins2_ins3" ,"ins3_ins4" ,"ins4_ins5","critical_period"),names_to="stage_transition",values_to="duration")
+totaldata1_pivot$stage_transition<-factor(totaldata1_pivot$stage_transition,levels=c("hatch_ins2....hatch_ins2","ins2_ins3","ins3_ins4","ins4_ins5","critical_period" ))
 
 #This file contains all relevant morphological, pigmentation, and development data
 ```
@@ -163,6 +165,9 @@ total_dvlpmtplot
 # stacked bar charts
 total_dvlmpt_bar<- ggplot(ddata.tidy, aes(x=Diet,y=date,fill=stage)) +
   geom_bar(position="fill", stat="identity") 
+
+ggplot(data=totaldata1_pivot%>% group_by(diet,stage_transition) %>% summarize(mean_duration=mean(duration,na.rm=T)),
+       aes(x=diet,y=mean_duration,fill=stage_transition))+ geom_bar(position=position_stack(reverse=T),stat="identity") 
 
 means <- ddata.tidy %>%
   mutate(stage=factor(stage, levels=c("HatchDate", "Ins2", "Ins3", "Ins4", "Ins5", "PupDate", "EcloseDate"))) %>%
