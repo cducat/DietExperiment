@@ -31,25 +31,34 @@ ddata.tidy$stageNum<-as.numeric(ddata.tidy$stage)-1
   
 larvae_ids<-unique(ddata.tidy$LarvID)
 # for each larva, calculate development rate metrics
-overall_DR<-c()
-numDaysHatchToEclose<-c()
-hatchToIns5_DR<-c()
-numDaysHatchToIns5<-c()
-pupation<-c()
-critical_period<-c()
-numDaysHatchtoPup <- c()
+overall_DR<-c() #rate
+numDaysHatchToEclose<-c() #days
+hatchToIns5_DR<-c() #rate
+numDaysHatchToIns5<-c() #days
+pupation<-c() #days
+critical_period<-c() #days
+numDaysHatchtoPup <- c() #days
+hatch_ins2 <- c()
+ins2_ins3 <- c()
+ins3_ins4 <- c()
+ins4_ins5 <- c()
+
 
 for(i in 1:length(larvae_ids))
 {
   larvaData<-ddata.tidy %>% filter(LarvID==larvae_ids[i])
   # stages per day, all stages from Hatch to Eclose (or last stage reached)
-  overall_DR[i]<- 1/coef(lm(stageNum~date,data=larvaData))[2] 
+  #overall_DR[i]<- 1/coef(lm(stageNum~date,data=larvaData))[2] 
+  
   # days from hatch to eclosure
   numDaysHatchToEclose[i]<-larvaData$date[larvaData$stage=="EcloseDate"]-larvaData$date[larvaData$stage=="HatchDate"]
+  
   # stages from Hatch to 5th instar (or last stage reached)
-  hatchToIns5_DR[i]<-1/coef(lm(stageNum~date,data=larvaData %>% filter(stageNum<5)))[2] 
+  # hatchToIns5_DR[i]<-1/coef(lm(stageNum~date,data=larvaData %>% filter(stageNum<5)))[2] 
+  
   # days from hatching to 5th instar
   numDaysHatchToIns5[i]<-larvaData$date[larvaData$stage=="Ins5"]-larvaData$date[larvaData$stage=="HatchDate"]
+  
   #duration of pupation
   pupation[i]<-larvaData$date[larvaData$stage=="EcloseDate"]-larvaData$date[larvaData$stage=="PupDate"]
   
@@ -58,9 +67,16 @@ for(i in 1:length(larvae_ids))
   
   #Hatch through pupation
   numDaysHatchtoPup[i] <- larvaData$date[larvaData$stage=="PupDate"]-larvaData$date[larvaData$stage=="HatchDate"]
+  
+  #Instar moults
+  hatch_ins2[i] <- larvaData$date[larvaData$stage=="Ins2"]-larvaData$date[larvaData$stage=="HatchDate"]
+  ins2_ins3[i] <- ins2_ins3[i] <- larvaData$date[larvaData$stage=="Ins3"]-larvaData$date[larvaData$stage=="Ins2"]
+  ins3_ins4[i] <- ins3_ins4[i] <- larvaData$date[larvaData$stage=="Ins4"]-larvaData$date[larvaData$stage=="Ins3"]
+  ins4_ins5[i] <- ins4_ins5[i] <- larvaData$date[larvaData$stage=="Ins5"]-larvaData$date[larvaData$stage=="Ins4"]
+  
 }
 
-df<-data.frame(LarvID=larvae_ids,overall_DR=overall_DR,hatchToIns5_DR=hatchToIns5_DR,numDaysHatchToIns5=numDaysHatchToIns5,critical_period=critical_period, numDaysHatchtoPup=numDaysHatchtoPup)
+df<-data.frame(LarvID=larvae_ids,numDaysHatchToEclose=numDaysHatchToEclose,numDaysHatchToIns5=numDaysHatchToIns5,hatch_ins2 <-hatch_ins2, ins2_ins3=ins2_ins3, ins3_ins4=ins3_ins4, ins4_ins5=ins4_ins5, critical_period=critical_period, numDaysHatchtoPup=numDaysHatchtoPup)
 
 #put back into original data, remove comments column
 ddata<-left_join(ddata,df,by="LarvID")
@@ -108,19 +124,13 @@ totaldata1$Dead <- NULL
 #Individual development rates
 ggplot(data=ddata.tidy %>% filter(LarvID==17),aes(x=date,y=stage))+geom_point()+geom_smooth(aes(y=as.numeric(stage)),method="lm",se=FALSE) 
 
-ggplot(data=ddata.tidy,aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
-  geom_smooth(aes(y=stage),se=TRUE) 
 
-ggplot(data=ddata.tidy %>% filter(stage == "Ins5" | stage== "PupDate"),aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
-  geom_smooth(aes(y=stage),method="lm",se=TRUE) 
 
-summary(ddata.tidy$stage)
 #HELP
 compare_means(fore.area ~ diet, data=dietmorph2)
 my_comparisons <- list(c("N", "T"))
 
-ggplot(data=ddata %>% group_by(Diet) %>% summarize(avDR=mean(overall_DR))) +
-  geom_segment()
+
 
 N_avgODR <- ddata %>%
   filter(diet=="N") %>%
