@@ -8,7 +8,7 @@ library("tidyverse")
 
 
 ```{r readData}
-
+#Development Data
 ddata <- read.csv("Diet1DvlpDataClean.csv")
 ddata$Ins2<-as.Date(as.character(ddata$Ins2),format="%d-%b")  # fix the year problem
 ddata$Ins3<-as.Date(as.character(ddata$Ins3),format="%d-%b")
@@ -19,7 +19,31 @@ ddata$PupDate<-as.Date(as.character(ddata$PupDate),format="%d-%b")
 ddata$EcloseDate<-as.Date(as.character(ddata$EcloseDate),format="%d-%b")
 summary(ddata)
 
+#Morph Data
+dietmorph <- read.csv("morphclean.csv")
 
+dietmorph<-left_join(dietmorph, dietmorph %>% select(specimen,wing,area) %>% spread(key=wing,area) %>% 
+  transmute(specimen=specimen,fore.area=(LFW+RFW)/2,hind.area=(LHW+RHW)/2, 
+            fore.area.asym=LFW-RFW,hind.area.asym=LHW-RHW))
+
+dietmorph<-left_join(dietmorph, dietmorph %>% select(specimen,wing,length) %>% spread(key=wing,length) %>% 
+  transmute(specimen=specimen,fore.length=(LFW+RFW)/2,hind.length=(LHW+RHW)/2, 
+            fore.length.asym=LFW-RFW,hind.length.asym=LHW-RHW))
+
+dietmorph <- left_join(dietmorph, dietmorph %>% select(specimen,wing,breadth) %>% spread(key=wing,breadth) %>% transmute(specimen=specimen, fore.width=(LFW+RFW)/2, hind.width=(LHW+RHW)/2))
+
+dietmorph<-left_join(dietmorph, dietmorph %>% select(specimen,wing,roundness) %>% spread(key=wing,roundness) %>%
+  transmute(specimen=specimen,fore.round=(LFW+RFW)/2))
+
+dietmorph <- left_join(dietmorph, dietmorph %>% select(specimen,wing,asp.ratio) %>% spread(key=wing,asp.ratio) %>% transmute(specimen=specimen, fore.asp.ratio=(LFW+RFW)/2))
+
+dietmorph1 <- subset(dietmorph, wing=="LFW") #gets rid of duplicates
+dietmorph2 <- select(dietmorph1, -c(wing, area, length, breadth, roundness, asp.ratio))
+
+
+#Color Data
+dietcolor <- read_csv("DietExp1_ColorClean.csv")
+dietcolor1 <- dietcolor[-48,] #this case is missing data
 
 ```
 
@@ -124,23 +148,51 @@ totaldata1$Dead <- NULL
 #Individual development rates
 ggplot(data=ddata.tidy %>% filter(LarvID==17),aes(x=date,y=stage))+geom_point()+geom_smooth(aes(y=as.numeric(stage)),method="lm",se=FALSE) 
 
+#Average development rates
+#plot <- ggplot(data=ddata.tidy,aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
+ # geom_smooth(aes(y=stage),se=TRUE) 
 
+plot1 <- ggplot(data=ddata.tidy %>% filter(stage == "Ins5" | stage== "PupDate"),aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
+  geom_smooth(aes(y=stage),method="lm",se=TRUE) 
+plot1
 
-#HELP
-compare_means(fore.area ~ diet, data=dietmorph2)
-my_comparisons <- list(c("N", "T"))
+total_dvlpmtplot <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="PupDate"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
+  geom_smooth(aes(y=stage), method="lm", se=TRUE)
+total_dvlpmtplot
 
+# stacked bar charts
+total_dvlmpt_bar<- ggplot(ddata.tidy, aes(x=Diet,y=date,fill=stage)) +
+  geom_bar(position="fill", stat="identity") 
 
+means <- ddata.tidy %>%
+  mutate(stage=factor(stage, levels=c("HatchDate", "Ins2", "Ins3", "Ins4", "Ins5", "PupDate", "EcloseDate"))) %>%
+  group_by(stage) %>%
+  summarise(mean=mean(date))
 
-N_avgODR <- ddata %>%
-  filter(diet=="N") %>%
-  group_by(stage, date) %>%
-  summarise(Navg = mean(overall_DR))
+testbar <- ggplot(ddata.tidy) +
+  geom_bar(aes(x=Diet, y=date, group=Diet, fill=mean), stat="identity") 
+  #scale_y_date(ddata.tidy$date, date_labels="%d/%b")
+  
 
-plot <- ggplot(ddata, aes(x=date, y=stage) +
-  geom_line(stat="smooth", method="lm")) +
-  compare_means()
-?compare_means
+#####################
+hatch_ins2plot <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="Ins2"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
+  geom_smooth(aes(y=stage), method="lm", se=TRUE)
+print(hatch_ins2plot)
+
+ins2_ins3plot <- ggplot(ddata.tidy %>% filter(stage == "Ins2" | stage=="Ins3"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
+  geom_smooth(aes(y=stage), method="lm", se=TRUE)
+print(ins2_ins3plot)
+
+ins3_ins4plot <- ggplot(ddata.tidy %>% filter(stage == "Ins3" | stage=="Ins4"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
+  geom_smooth(aes(y=stage), method="lm", se=TRUE)
+print(ins3_ins4plot)
+
+ins4_ins5plot <- ggplot(ddata.tidy %>% filter(stage == "Ins4" | stage=="Ins5"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
+  geom_smooth(aes(y=stage), method="lm", se=TRUE)
+print(ins4_ins5plot)
+
+str(ddata.tidy)
+
 
 
  
