@@ -4,6 +4,11 @@ output: html_notebook
 ---
 ```{r setup}
 library("tidyverse")
+library("tidyr")
+library("ggplot2")
+library("ggpubr")
+library("dplyr")
+library("nlme")
 ```
 
 
@@ -100,7 +105,7 @@ for(i in 1:length(larvae_ids))
   
 }
 
-df<-data.frame(LarvID=larvae_ids,numDaysHatchToEclose=numDaysHatchToEclose,numDaysHatchToIns5=numDaysHatchToIns5,hatch_ins2 <-hatch_ins2, ins2_ins3=ins2_ins3, ins3_ins4=ins3_ins4, ins4_ins5=ins4_ins5, critical_period=critical_period, numDaysHatchtoPup=numDaysHatchtoPup)
+df<-data.frame(LarvID=larvae_ids,numDaysHatchToEclose=numDaysHatchToEclose,numDaysHatchToIns5=numDaysHatchToIns5,hatch_ins2 <-hatch_ins2, ins2_ins3=ins2_ins3, ins3_ins4=ins3_ins4, ins4_ins5=ins4_ins5, critical_period=critical_period, pupation=pupation, numDaysHatchtoPup=numDaysHatchtoPup)
 
 #put back into original data, remove comments column
 ddata<-left_join(ddata,df,by="LarvID")
@@ -139,47 +144,33 @@ totaldata1$Infection.y <- NULL
 totaldata1$X <- NULL
 totaldata1$Dead <- NULL
 
-totaldata1_pivot<-totaldata1 %>% pivot_longer(c("hatch_ins2....hatch_ins2","ins2_ins3" ,"ins3_ins4" ,"ins4_ins5","critical_period"),names_to="stage_transition",values_to="duration")
-totaldata1_pivot$stage_transition<-factor(totaldata1_pivot$stage_transition,levels=c("hatch_ins2....hatch_ins2","ins2_ins3","ins3_ins4","ins4_ins5","critical_period" ))
+totaldata1_pivot<-totaldata1 %>% pivot_longer(c("hatch_ins2....hatch_ins2","ins2_ins3" ,"ins3_ins4" ,"ins4_ins5","critical_period", "pupation"),names_to="stage_transition",values_to="duration")
+totaldata1_pivot$stage_transition<-factor(totaldata1_pivot$stage_transition,levels=c("hatch_ins2....hatch_ins2","ins2_ins3","ins3_ins4","ins4_ins5","critical_period", "pupation"))
 
 #This file contains all relevant morphological, pigmentation, and development data
 ```
 
-```{r average development plots} 
+```{r development plots} 
 
-#Individual development rates
+# How to generate individual development rates
 ggplot(data=ddata.tidy %>% filter(LarvID==17),aes(x=date,y=stage))+geom_point()+geom_smooth(aes(y=as.numeric(stage)),method="lm",se=FALSE) 
 
 #Average development rates
-#plot <- ggplot(data=ddata.tidy,aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
- # geom_smooth(aes(y=stage),se=TRUE) 
+overallDRplot <- ggplot(data=ddata.tidy,aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
+ geom_smooth(aes(y=stage),se=TRUE) 
 
-plot1 <- ggplot(data=ddata.tidy %>% filter(stage == "Ins5" | stage== "PupDate"),aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
-  geom_smooth(aes(y=stage),method="lm",se=TRUE) 
-plot1
-
-total_dvlpmtplot <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="PupDate"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
+total_larvaltime <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="PupDate"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
   geom_smooth(aes(y=stage), method="lm", se=TRUE)
-total_dvlpmtplot
 
-# stacked bar charts
-total_dvlmpt_bar<- ggplot(ddata.tidy, aes(x=Diet,y=date,fill=stage)) +
-  geom_bar(position="fill", stat="identity") 
 
-ggplot(data=totaldata1_pivot%>% group_by(diet,stage_transition) %>% summarize(mean_duration=mean(duration,na.rm=T)),
-       aes(x=diet,y=mean_duration,fill=stage_transition))+ geom_bar(position=position_stack(reverse=T),stat="identity") 
+# stacked bar chart
+totaldvlpbar<-ggplot(data=totaldata1_pivot%>% group_by(diet,stage_transition) %>% summarize(mean_duration=mean(duration,na.rm=T)),
+       aes(x=diet,y=mean_duration,fill=stage_transition)) + 
+  geom_bar(position=position_stack(reverse=T),stat="identity") +
+  labs(x="Diet", y="Number of days", title="Time spent in each larval development stage") +
+  scale_fill_discrete(name="Stage", breaks=c("hatch_ins2....hatch_ins2", "ins2_ins3", "ins3_ins4", "ins4_ins5", "critical_period", "pupation"), labels=c("First instar", "Second instar", "Third instar", "Fourth instar", "Fifth instar", "Pupation"))
 
-means <- ddata.tidy %>%
-  mutate(stage=factor(stage, levels=c("HatchDate", "Ins2", "Ins3", "Ins4", "Ins5", "PupDate", "EcloseDate"))) %>%
-  group_by(stage) %>%
-  summarise(mean=mean(date))
-
-testbar <- ggplot(ddata.tidy) +
-  geom_bar(aes(x=Diet, y=date, group=Diet, fill=mean), stat="identity") 
-  #scale_y_date(ddata.tidy$date, date_labels="%d/%b")
-  
-
-#####################
+#Transition rates
 hatch_ins2plot <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="Ins2"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
   geom_smooth(aes(y=stage), method="lm", se=TRUE)
 print(hatch_ins2plot)
@@ -196,34 +187,22 @@ ins4_ins5plot <- ggplot(ddata.tidy %>% filter(stage == "Ins4" | stage=="Ins5"), 
   geom_smooth(aes(y=stage), method="lm", se=TRUE)
 print(ins4_ins5plot)
 
-str(ddata.tidy)
-
-
-
- 
-
+pupationplot <- ggplot(data=ddata.tidy %>% filter(stage == "Ins5" | stage== "PupDate"),aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
+  geom_smooth(aes(y=stage),method="lm",se=TRUE)
 
 ```
 
 ```{r development rate regression plots}
 
-
 #Plots for host plant species v. overall development rate/days to development
-overall_DR.plot <- ggboxplot(ddata, x="Diet", y="overall_DR", fill="lightblue") +
+DRcomparisonplot <- ggboxplot(ddata, x="Diet", y="numDaysHatchToEclose", fill="lightblue") +
 labs(y="Overall Development Rate", x = "Host Plant Species") + 
 ggtitle("Effects of host plant species on development rate") +
 theme_minimal() +
 scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
 stat_compare_means(method="anova")
-print(overall_DR.plot)
+print(DRcomparisonplot)
 
-overall_days.plot <- ggboxplot(ddata, x="Diet", y="numDaysHatchToEclose", fill="lightblue") +
-labs(y="Number of Days", x = "Host Plant Species") + 
-ggtitle("Effects of host plant species on development rate") +
-theme_minimal() +
-scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
-stat_compare_means(method="anova")
-print(overall_days.plot)
  
 
 ```
@@ -231,21 +210,31 @@ print(overall_days.plot)
 ```{r development/morph regressions}
 
 #USE TOTALDATA1 DATA FILE
-d1 <- gls(fore.area~overall_DR, data=totaldata1)
+totaldata1new <- na.omit(totaldata1)
+
+d1 <- lm(fore.area~numDaysHatchToEclose, data=totaldata1)
 d1aov <- aov(d1, type="marginal", data=totaldata1)
 anova(d1aov)
 
-d1plot <- ggplot(totaldata1, aes(x=overall_DR, y=fore.area)) +
+d1plot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=fore.area)) +
   geom_smooth(method="lm") 
 print(d1plot)
 
-d2 <- gls(hind.area~overall_DR, data=totaldata1)
+d2 <- lm(hind.area~numDaysHatchToEclose, data=totaldata1)
 d2aov <- aov(d2, type="marginal", data=totaldata1)
 anova(d2aov)
 
-d2plot <-ggplot(totaldata1, aes(x=overall_DR, y=hind.area)) +
+d2plot <-ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=hind.area)) +
   geom_smooth(method="lm") 
 print(d2plot)
+
+d3 <- lm(Melarea~numDaysHatchToEclose, data=totaldata1)
+d3aov <- aov(d3, type="marginal", data=totaldata1)
+anova(d3aov)
+
+d3plot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=Melarea)) +
+  geom_smooth(method="lm")
+print(d3plot)
 
 
 ```
