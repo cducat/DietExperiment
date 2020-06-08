@@ -5,12 +5,16 @@ date: "3/13/2020"
 output: html_document
 ---
 ```{r setup, include=FALSE}
+
+
 library(tidyverse)
 library(dplyr)
 library(nlme)
 library(pwr)
 library(ggplot2)
 library(ggpubr)
+library(pear)
+library(compute.es)
 ```
 
 
@@ -48,6 +52,9 @@ attach(dietmorph2)
 diet.table <- table(sex, diet, infection)
 print(diet.table)
 
+table <- table(diet)
+print(table)
+
 inf.table <- table(sex, infection)
 print(inf.table)
 ```
@@ -55,10 +62,12 @@ print(inf.table)
 ```{r forewing area}
 #Used gls instead of lme because predictor variables are categorical, not continuous. Thus it's not a linear model, but a generalized least squares regression. aov() is better than anova() in this scenario because it internally calls lm(), which fits the model
 
+summary(dietmorph2)
 #original model
-m1 <- gls(fore.area ~ diet + sex + infection, data=dietmorph2)
-m1aov <- aov(m1, type="marginal")
+m1 <- gls(fore.area ~ diet*sex*infection, data=dietmorph2)
+m1aov <- aov(m1)
 anova(m1aov)
+
 
 #residuals plot
 m1resid <-resid(m1, type="response")
@@ -98,7 +107,7 @@ cex=.4, xlab="diet", ylab="standardized resid", cex.lab=.8)
 ```
 
 ```{r hindwing area}
-m2 <- gls(hind.area ~ diet + sex + infection, data=dietmorph2)
+m2 <- gls(hind.area ~ diet*sex*infection, data=dietmorph2)
 m2aov <- aov(m2, type="marginal")
 anova(m2aov)
 
@@ -122,75 +131,76 @@ anova(m2, m2random, m2.vident, m2.vident2, m2.vident3) #retain original model
 
 ```{r forewing area symmetry}
 
-m3 <- gls(fore.area.asym ~ diet + sex + infection, data=dietmorph2)
+m3 <- gls(fore.area.asym ~ diet * sex * infection, data=dietmorph2)
 m3aov <- aov(m3, type="marginal")
 anova(m3aov)
 ```
 
 ```{r hindwing area asymmetry}
-m4 <- gls(hind.area.asym ~ diet + sex + infection, data=dietmorph2)
+m4 <- gls(hind.area.asym ~ diet * sex * infection, data=dietmorph2)
 m4aov <- aov(m4, type="marginal")
 anova(m4aov)
 ```
 
 ```{r forewing roundness}
 
-m5 <- gls(fore.round ~ diet + sex + infection, data=dietmorph2)
+m5 <- gls(fore.round ~ diet * sex * infection, data=dietmorph2)
 m5aov <- aov(m5, type="marginal")
 anova(m5aov)
 ```
 
 ```{r forewing length and width}
 
-m6 <- gls(fore.length ~ diet + sex + infection, data=dietmorph2)
+m6 <- gls(fore.length ~ diet * sex * infection, data=dietmorph2)
 m6aov <- aov(m6, type="marginal")
 anova(m6aov)
 
-m7 <- gls(fore.width ~ diet + sex + infection, data=dietmorph2)
+m7 <- gls(fore.width ~ diet * sex * infection, data=dietmorph2)
 m7aov <- aov(m7, type="marginal")
 anova(m7aov)
 ```
 
 ```{r forewing aspect ratio}
 
-m8 <- gls(fore.asp.ratio ~ diet + sex + infection, data=dietmorph2)
+m8 <- gls(fore.asp.ratio ~ diet * sex * infection, data=dietmorph2)
 m8aov <- aov(m8, type="marginal")
 anova(m8aov)
 ```
 
 ```{r hindwing length and width}
 
-m9 <-gls(hind.length ~ diet + sex + infection, data=dietmorph2)
+m9 <-gls(hind.length ~ diet * sex * infection, data=dietmorph2)
 m9aov <- aov(m9, type="marginal")
 anova(m9aov)
 
-m10 <- gls(hind.width ~ diet + sex + infection, data=dietmorph2)
+m10 <- gls(hind.width ~ diet * sex * infection, data=dietmorph2)
 m10aov <- aov(m10, type="marginal")
 anova(m10aov)
 ```
 
+
 ```{r color exploratory analyses}
 #cleaned/averaged by hand
-dietcolor <- read_csv("DietExp1 Color Data/DietExp1_ColorClean.csv")
+dietcolor <- read_csv("DietExp1_ColorClean.csv")
 dietcolor1 <- dietcolor[-48,] #this case is missing data
 
-c1<-gls(Redhue ~ Diet + Sex + Infection, data=dietcolor1) 
+c1<-gls(Redhue ~ Diet * Sex * Infection, data=dietcolor1) 
 c1aov <- aov(c1,type="marginal", data=dietcolor1)
 anova(c1aov)
 
-c2<-gls(Redsat ~ Diet + Sex + Infection, data=dietcolor1) 
+c2<-gls(Redsat ~ Diet * Sex * Infection, data=dietcolor1) 
 c2aov <- aov(c2, type="marginal", data=dietcolor1)
 anova(c2aov)
 
-c3<-gls(Redint ~ Diet + Sex + Infection, data=dietcolor1)
+c3<-gls(Redint ~ Diet * Sex * Infection, data=dietcolor1)
 c3aov <- aov(c3, type="marginal", data=dietcolor1)
 anova(c3aov)
 
-c4 <- gls(Melarea ~ Diet + Sex + Infection, data=dietcolor1)
+c4 <- gls(Melarea ~ Diet * Sex * Infection, data=dietcolor1)
 c4aov <- aov(c4, type="marginal", data=dietcolor1)
 anova(c4aov)
 
-c5 <- gls(Blkdens ~ Diet + Sex + Infection, data=dietcolor1)
+c5 <- gls(Blkdens ~ Diet * Sex * Infection, data=dietcolor1)
 c5aov <- aov(c5, type="marginal", data=dietcolor1)
 anova(c5aov)
 
@@ -303,13 +313,195 @@ scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
 stat_compare_means(method="anova", label="p.format")
 print(melarea.plot)
 
-blkdens.plot <- ggboxplot(dietcolor1, x="Diet", y="Blkdens", fill="Sex") +
+blkdens.plot <- ggboxplot(dietcolor1,x="Diet", y="Blkdens", fill="Sex") +
 labs(y="Density of melanin pigment", x = "Host Plant Species") + 
 ggtitle("Effects of host plant species on black pigment density") +
 theme_minimal() +
 scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
-stat_compare_means(method="anova", label="p.format")
+stat_compare_means(method="anova", label="p.format") +
+facet_wrap(~Infection)
 print(blkdens.plot)
+
+```
+```{r MANCOVAs}
+#Subset data by sex
+femaledata <- as.data.frame(totaldata1 %>% filter(sex=="F")) #22 total females
+maledata <- as.data.frame(totaldata1 %>% filter(sex=="M")) #23 total males
+
+#female color
+y_f <- cbind(femaledata$Redhue, femaledata$Redsat, femaledata$Redint, femaledata$Melarea, femaledata$Blkdens)
+fit <- manova(y_f ~ diet*infection, data=femaledata)
+summary.aov(fit)
+
+#male color
+y_m <-cbind(maledata$Redhue, maledata$Redsat, maledata$Redint, maledata$Melarea, maledata$Blkdens)
+fitm <- manova(y_m ~ diet*infection, data=maledata)
+summary.aov(fitm)
+
+#male FW morph
+y_mfw <- cbind(maledata$fore.area, maledata$fore.length, maledata$fore.width, maledata$fore.asp.ratio, maledata$fore.round)
+fit_mfw <- manova(y_mfw ~ diet*infection, data=maledata)
+summary.aov(fit_mfw)
+
+#female FW morph
+y_ffw <- cbind(femaledata$fore.area, femaledata$fore.length, femaledata$fore.width, femaledata$fore.asp.ratio, femaledata$fore.round)
+fit_ffw <- manova(y_ffw ~ diet*infection, data=femaledata)
+summary.aov(fit_ffw)
+
+#male HW morph
+y_mhw <- cbind(maledata$hind.area, maledata$hind.length, maledata$hind.width)
+fit_mhw <- manova(y_mhw ~ diet*infection, data=maledata)
+summary.aov(fit_mhw)
+
+#female HW morph
+y_fhw <- cbind(femaledata$hind.area, femaledata$hind.length, femaledata$hind.width)
+fit_fhw <- manova(y_fhw ~ diet*infection, data=femaledata)
+summary.aov(fit_fhw)
+
+#male asymmetry
+y_ma <- cbind(maledata$fore.area.asym, maledata$hind.area.asym, maledata$fore.length.asym, maledata$hind.length.asym)
+fit_ma <- manova(y_ma ~ diet*infection, data=maledata)
+summary.aov(fit_ma)
+
+#female asymmetry
+y_fa <- cbind(femaledata$fore.area.asym, femaledata$hind.area.asym, femaledata$fore.length.asym, femaledata$hind.length.asym)
+fit_fa <- manova(y_fa ~ diet*infection, data=femaledata)
+summary.aov(fit_fa)
+
+
+
+```
+```{r calculating effects sizes of diet}
+#forewing area
+group_by(dietmorph2, diet, sex) %>%
+  summarise(count=n(), mean=mean(fore.area, na.rm=TRUE), sd=sd(fore.area, na.rm=TRUE))
+
+#forewing length
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(fore.length, na.rm=TRUE), sd=sd(fore.length, na.rm=TRUE))
+
+#forewing width
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(fore.width, na.rm=TRUE), sd=sd(fore.width, na.rm=TRUE))
+
+#forewing roundness
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(fore.round, na.rm=TRUE), sd=sd(fore.round, na.rm=TRUE))
+
+#forewing aspect ratio
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(fore.asp.ratio, na.rm=TRUE), sd=sd(fore.asp.ratio, na.rm=TRUE))
+
+#hindwing area
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(hind.area, na.rm=TRUE), sd=sd(hind.area, na.rm=TRUE))
+
+#hindwing length
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(hind.length, na.rm=TRUE), sd=sd(hind.length, na.rm=TRUE))
+
+#hindwing width
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(hind.width, na.rm=TRUE), sd=sd(hind.width, na.rm=TRUE))
+
+#forewing area asym
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(fore.area.asym, na.rm=TRUE), sd=sd(fore.area.asym, na.rm=TRUE))
+
+#forewing  length asym
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(fore.length.asym, na.rm=TRUE), sd=sd(fore.length.asym, na.rm=TRUE))
+
+#hindwing area asym
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(hind.area.asym, na.rm=TRUE), sd=sd(hind.area.asym, na.rm=TRUE))
+
+#hindwing length asym
+group_by(dietmorph2, diet) %>%
+  summarise(count=n(), mean=mean(hind.length.asym, na.rm=TRUE), sd=sd(hind.length.asym, na.rm=TRUE))
+
+
+#####################################################
+
+#Red Hue
+group_by(maledata, diet) %>%
+  summarise(count=n(), mean=mean(Redhue, na.rm=TRUE), sd=sd(Redhue, na.rm=TRUE))
+
+group_by(femaledata, diet) %>%
+  summarise(count=n(), mean=mean(Redhue, na.rm=TRUE), sd=sd(Redhue, na.rm=TRUE))
+
+#Red Sat
+group_by(maledata, diet) %>%
+  summarise(count=n(), mean=mean(Redsat, na.rm=TRUE), sd=sd(Redsat, na.rm=TRUE))
+
+group_by(femaledata, diet) %>%
+  summarise(count=n(), mean=mean(Redsat, na.rm=TRUE), sd=sd(Redsat, na.rm=TRUE))
+
+#Red Int
+group_by(maledata, diet) %>%
+  summarise(count=n(), mean=mean(Redint, na.rm=TRUE), sd=sd(Redint, na.rm=TRUE))
+
+group_by(femaledata, diet) %>%
+  summarise(count=n(), mean=mean(Redint, na.rm=TRUE), sd=sd(Redint, na.rm=TRUE))
+
+#Mel Area
+group_by(maledata, diet) %>%
+  summarise(count=n(), mean=mean(Melarea, na.rm=TRUE), sd=sd(Melarea, na.rm=TRUE))
+
+group_by(femaledata, diet) %>%
+  summarise(count=n(), mean=mean(Melarea, na.rm=TRUE), sd=sd(Melarea, na.rm=TRUE))
+```
+
+```{r partial effects plot}
+
+#manually creating partial effects plot
+lm1 <- lm(fore.area ~ diet + infection + numDaysHatchToEclose, data=totaldata1, na.action=na.exclude)
+lm2 <- lm(fore.area ~ numDaysHatchToEclose + infection, data=totaldata1)
+lm3 <- lm(numDaysHatchToEclose ~ diet + infection, data=totaldata1)
+
+x <- resid(lm3)
+y <- resid(lm2)
+
+
+plot(x,y,type="n", xlab="Number of Days from Hatch to Eclosure",  ylab="Forewing Area")
+part <- lm(y~x)
+wx = par("usr")[1:2]
+new.x = seq(wx[1],wx[2],len=100)
+pred = predict(part, new=data.frame(x=new.x), interval="conf")
+lines(new.x,pred[,"fit"],lwd=2)
+lines(new.x,pred[,"lwr"],lty=3)
+lines(new.x,pred[,"upr"],lty=3)
+points(x,y,pch=16,col="steelblue")
+
+
+#using peplot function from pear package
+peplot <- function(lm1,diet,ci=.95, plot_points = "n",
+                   xlab=var,ylab=names(mod[12]$lm1)[1],
+                   main="Partial Effect Plot",
+                   pe_lty=1,pe_lwd=3,pe_col="black",
+                   ci_lty=1,ci_lwd=1,ci_col="black",
+                   pch_col="black",pch_ty=19,
+                   ylim=c(min(pred[,"lwr"]),max(pred[,"upr"]))){
+  modDat <- mod[12]$lm1
+  modDat1 <- modDat[,-1]
+  modDat2 <- modDat[,which(names(modDat)!="diet")]
+  x <- resid(lm(modDat1[,var] ~., data=modDat1[,which(names(modDat1)!=var)]))
+  y <- resid(lm(modDat2[,1] ~ ., modDat2[,-1]))
+  plot(x,y,type=plot_points,xlab=xlab,ylab=ylab,
+       ylim=ylim,col=pch_col,pch=pch_ty,
+       main=main)
+  part <- lm(y~x)
+  wx <- par("usr")[1:2]
+  new.x <- seq(wx[1],wx[2],len=100)
+  pred <- predict(part, new=data.frame(x=new.x), interval="conf",
+                  level = ci)
+  lines(new.x,pred[,"fit"],lwd=pe_lwd,lty=pe_lty,col=pe_col)
+  lines(new.x,pred[,"lwr"],lwd=ci_lwd,lty=ci_lty,col=ci_col)
+  lines(new.x,pred[,"upr"],lwd=ci_lwd,lty=ci_lty,col=ci_col)
+}
+
+peplot(lm1, var="diet")
+
 
 ```
 
