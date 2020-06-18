@@ -6,7 +6,6 @@ output: html_document
 ---
 ```{r setup, include=FALSE}
 
-
 library("tidyverse")
 library("tidyr")
 library("dplyr")
@@ -43,17 +42,16 @@ dietmorph<-left_join(dietmorph, dietmorph %>% select(specimen,wing,roundness) %>
 dietmorph <- left_join(dietmorph, dietmorph %>% select(specimen,wing,asp.ratio) %>% spread(key=wing,asp.ratio) %>% transmute(specimen=specimen, fore.asp.ratio=(LFW+RFW)/2))
 
 
-
 dietmorph1 <- subset(dietmorph, wing=="LFW") #gets rid of duplicates
 dietmorph2 <- select(dietmorph1, -c(wing, area, length, breadth, roundness, asp.ratio)) #final product for analyses
 ```
-```{r COLOR data}
+```{r read COLOR data}
 #cleaned/averaged by hand
 dietcolor <- read_csv("DietExp1_ColorClean.csv")
 dietcolor1 <- dietcolor[-48,] #this case is missing data
 ```
 
-```{r DEVELOPMENT data}
+```{r cleaning DEVELOPMENT data}
 # Read Development Data
 ddata <- read.csv("Diet1DvlpDataClean.csv")
 ddata$Ins2<-as.Date(as.character(ddata$Ins2),format="%d-%b")  # fix the year problem
@@ -143,6 +141,11 @@ totaldata1$Infection.x <- NULL
 totaldata1$Infection.y <- NULL
 totaldata1$X <- NULL
 totaldata1$Dead <- NULL
+
+#Calculating and Adding Percent Melanin variable to totaldata1
+totaldata1 <- left_join(totaldata1, totaldata1 %>% select(specimen,fore.area, Melarea) %>% transmute(specimen=specimen, percent.mel=(Melarea/fore.area)))
+
+totaldata1$Melarea=NULL
 
 totaldata1_pivot<-totaldata1 %>% pivot_longer(c("hatch_ins2....hatch_ins2","ins2_ins3" ,"ins3_ins4" ,"ins4_ins5","critical_period", "pupation"),names_to="stage_transition",values_to="duration")
 totaldata1_pivot$stage_transition<-factor(totaldata1_pivot$stage_transition,levels=c("hatch_ins2....hatch_ins2","ins2_ins3","ins3_ins4","ins4_ins5","critical_period", "pupation"))
@@ -295,8 +298,8 @@ c3<-gls(Redint ~ Diet * Sex * Infection, data=dietcolor1)
 c3aov <- aov(c3, type="marginal", data=dietcolor1)
 anova(c3aov)
 
-c4 <- gls(Melarea ~ Diet * Sex * Infection, data=dietcolor1)
-c4aov <- aov(c4, type="marginal", data=dietcolor1)
+c4 <- gls(percent.mel ~ diet * sex * infection, data=totaldata1)
+c4aov <- aov(c4, type="marginal", data=totaldata1)
 anova(c4aov)
 
 c5 <- gls(Blkdens ~ Diet * Sex * Infection, data=dietcolor1)
@@ -347,7 +350,8 @@ labs(y="Roundness", x = "Host Plant Species") +
 ggtitle("Effects of host plant species on forewing roundness") +
 theme_minimal() +
 scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
-stat_compare_means(method="anova")
+stat_compare_means(method="anova") +
+  facet_wrap(~infection)
 print(dfround.plot)
 
 
@@ -374,7 +378,7 @@ ggtitle("Effects of host plant species on hindwing asymmetry") +
 theme_minimal() +
 scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
 stat_compare_means(method="anova")
-print(dhasym.plot)
+print(dhasym.plot) 
   
 ```
 
@@ -404,13 +408,13 @@ scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
 stat_compare_means(method="anova", label="p.format")
 print(redint.plot)
 
-melarea.plot <- ggboxplot(dietcolor1, x="Diet", y="Melarea", fill="Sex") +
-labs(y="Area of melanin", x = "Host Plant Species") + 
-ggtitle("Effects of host plant species on area of wing melanin") +
+percentmel.plot <- ggboxplot(totaldata1, x="diet", y="percent.mel", fill="infection") +
+labs(y="Percentage of Melanin", x = "Host Plant Species") + 
+ggtitle("Effects of host plant species and infection on wing melanism") +
 theme_minimal() +
 scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
-stat_compare_means(method="anova", label="p.format")
-print(melarea.plot)
+  facet_wrap(~sex)
+print(percentmel.plot)
 
 blkdens.plot <- ggboxplot(dietcolor1,x="Diet", y="Blkdens", fill="Sex") +
 labs(y="Density of melanin pigment", x = "Host Plant Species") + 
@@ -428,12 +432,12 @@ femaledata <- as.data.frame(totaldata1 %>% filter(sex=="F")) #22 total females
 maledata <- as.data.frame(totaldata1 %>% filter(sex=="M")) #23 total males
 
 #female color
-y_f <- cbind(femaledata$Redhue, femaledata$Redsat, femaledata$Redint, femaledata$Melarea, femaledata$Blkdens)
+y_f <- cbind(femaledata$Redhue, femaledata$Redsat, femaledata$Redint, femaledata$percent.mel, femaledata$Blkdens)
 fit <- manova(y_f ~ diet*infection, data=femaledata)
 summary.aov(fit)
 
 #male color
-y_m <-cbind(maledata$Redhue, maledata$Redsat, maledata$Redint, maledata$Melarea, maledata$Blkdens)
+y_m <-cbind(maledata$Redhue, maledata$Redsat, maledata$Redint, maledata$percent.mel, maledata$Blkdens)
 fitm <- manova(y_m ~ diet*infection, data=maledata)
 summary.aov(fitm)
 
@@ -467,9 +471,8 @@ y_fa <- cbind(femaledata$fore.area.asym, femaledata$hind.area.asym, femaledata$f
 fit_fa <- manova(y_fa ~ diet*infection, data=femaledata)
 summary.aov(fit_fa)
 
-
-
 ```
+
 ```{r calculating effects sizes of diet}
 #forewing area
 group_by(dietmorph2, diet, sex) %>%
@@ -543,12 +546,12 @@ group_by(maledata, diet) %>%
 group_by(femaledata, diet) %>%
   summarise(count=n(), mean=mean(Redint, na.rm=TRUE), sd=sd(Redint, na.rm=TRUE))
 
-#Mel Area
-group_by(maledata, diet) %>%
-  summarise(count=n(), mean=mean(Melarea, na.rm=TRUE), sd=sd(Melarea, na.rm=TRUE))
+#Percent Mel
+group_by(maledata, infection) %>%
+  summarise(count=n(), mean=mean(percent.mel, na.rm=TRUE), sd=sd(percent.mel, na.rm=TRUE))
 
-group_by(femaledata, diet) %>%
-  summarise(count=n(), mean=mean(Melarea, na.rm=TRUE), sd=sd(Melarea, na.rm=TRUE))
+group_by(femaledata, infection) %>%
+  summarize(count=n(), mean=mean(percent.mel, na.rm=TRUE), sd=sd(percent.mel, na.rm=TRUE))
 
 #Black Density
 group_by(maledata, diet) %>%
@@ -558,56 +561,5 @@ group_by(femaledata, diet) %>%
   summarise(count=n(), mean=mean(Blkdens, na.rm=TRUE), sd=sd(Blkdens, na.rm=TRUE))
 ```
 
-```{r partial effects plot}
 
-#manually creating partial effects plot
-lm1 <- lm(fore.area ~ diet + infection + numDaysHatchToEclose, data=totaldata1, na.action=na.exclude)
-lm2 <- lm(fore.area ~ numDaysHatchToEclose + infection, data=totaldata1)
-lm3 <- lm(numDaysHatchToEclose ~ diet + infection, data=totaldata1)
-
-x <- resid(lm3)
-y <- resid(lm2)
-
-
-plot(x,y,type="n", xlab="Number of Days from Hatch to Eclosure",  ylab="Forewing Area")
-part <- lm(y~x)
-wx = par("usr")[1:2]
-new.x = seq(wx[1],wx[2],len=100)
-pred = predict(part, new=data.frame(x=new.x), interval="conf")
-lines(new.x,pred[,"fit"],lwd=2)
-lines(new.x,pred[,"lwr"],lty=3)
-lines(new.x,pred[,"upr"],lty=3)
-points(x,y,pch=16,col="steelblue")
-
-
-#using peplot function from pear package
-peplot <- function(lm1,diet,ci=.95, plot_points = "n",
-                   xlab=var,ylab=names(mod[12]$lm1)[1],
-                   main="Partial Effect Plot",
-                   pe_lty=1,pe_lwd=3,pe_col="black",
-                   ci_lty=1,ci_lwd=1,ci_col="black",
-                   pch_col="black",pch_ty=19,
-                   ylim=c(min(pred[,"lwr"]),max(pred[,"upr"]))){
-  modDat <- mod[12]$lm1
-  modDat1 <- modDat[,-1]
-  modDat2 <- modDat[,which(names(modDat)!="diet")]
-  x <- resid(lm(modDat1[,var] ~., data=modDat1[,which(names(modDat1)!=var)]))
-  y <- resid(lm(modDat2[,1] ~ ., modDat2[,-1]))
-  plot(x,y,type=plot_points,xlab=xlab,ylab=ylab,
-       ylim=ylim,col=pch_col,pch=pch_ty,
-       main=main)
-  part <- lm(y~x)
-  wx <- par("usr")[1:2]
-  new.x <- seq(wx[1],wx[2],len=100)
-  pred <- predict(part, new=data.frame(x=new.x), interval="conf",
-                  level = ci)
-  lines(new.x,pred[,"fit"],lwd=pe_lwd,lty=pe_lty,col=pe_col)
-  lines(new.x,pred[,"lwr"],lwd=ci_lwd,lty=ci_lty,col=ci_col)
-  lines(new.x,pred[,"upr"],lwd=ci_lwd,lty=ci_lty,col=ci_col)
-}
-
-peplot(lm1, var="diet")
-
-
-```
 

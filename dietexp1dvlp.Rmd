@@ -9,111 +9,12 @@ library("ggplot2")
 library("ggpubr")
 library("dplyr")
 library("nlme")
+library("gridExtra")
 ```
 
-
-```{r readData}
-#Development Data
-ddata <- read.csv("Diet1DvlpDataClean.csv")
-ddata$Ins2<-as.Date(as.character(ddata$Ins2),format="%d-%b")  # fix the year problem
-ddata$Ins3<-as.Date(as.character(ddata$Ins3),format="%d-%b")
-ddata$Ins4<-as.Date(as.character(ddata$Ins4),format="%d-%b")
-ddata$Ins5<-as.Date(as.character(ddata$Ins5),format="%d-%b")
-ddata$HatchDate<-as.Date(as.character(ddata$HatchDate),format="%d-%b")
-ddata$PupDate<-as.Date(as.character(ddata$PupDate),format="%d-%b")
-ddata$EcloseDate<-as.Date(as.character(ddata$EcloseDate),format="%d-%b")
-summary(ddata)
-
-#Morph Data
-dietmorph <- read.csv("morphclean.csv")
-
-dietmorph<-left_join(dietmorph, dietmorph %>% select(specimen,wing,area) %>% spread(key=wing,area) %>% 
-  transmute(specimen=specimen,fore.area=(LFW+RFW)/2,hind.area=(LHW+RHW)/2, 
-            fore.area.asym=LFW-RFW,hind.area.asym=LHW-RHW))
-
-dietmorph<-left_join(dietmorph, dietmorph %>% select(specimen,wing,length) %>% spread(key=wing,length) %>% 
-  transmute(specimen=specimen,fore.length=(LFW+RFW)/2,hind.length=(LHW+RHW)/2, 
-            fore.length.asym=LFW-RFW,hind.length.asym=LHW-RHW))
-
-dietmorph <- left_join(dietmorph, dietmorph %>% select(specimen,wing,breadth) %>% spread(key=wing,breadth) %>% transmute(specimen=specimen, fore.width=(LFW+RFW)/2, hind.width=(LHW+RHW)/2))
-
-dietmorph<-left_join(dietmorph, dietmorph %>% select(specimen,wing,roundness) %>% spread(key=wing,roundness) %>%
-  transmute(specimen=specimen,fore.round=(LFW+RFW)/2))
-
-dietmorph <- left_join(dietmorph, dietmorph %>% select(specimen,wing,asp.ratio) %>% spread(key=wing,asp.ratio) %>% transmute(specimen=specimen, fore.asp.ratio=(LFW+RFW)/2))
-
-dietmorph1 <- subset(dietmorph, wing=="LFW") #gets rid of duplicates
-dietmorph2 <- select(dietmorph1, -c(wing, area, length, breadth, roundness, asp.ratio))
-
-
-#Color Data
-dietcolor <- read_csv("DietExp1_ColorClean.csv")
-dietcolor1 <- dietcolor[-48,] #this case is missing data
-
-```
-
-```{r create RVs}
-ddata.tidy<-gather(ddata, key="stage",value="date",-LarvID,-Diet,-FamLine,-Infection,-Dead,-Sex, -X)
-ddata.tidy$stage<-factor(ddata.tidy$stage,levels=c("HatchDate","Ins2", "Ins3","Ins4","Ins5","PupDate","EcloseDate"))
-ddata.tidy$stageNum<-as.numeric(ddata.tidy$stage)-1
-
-  
-larvae_ids<-unique(ddata.tidy$LarvID)
-# for each larva, calculate development rate metrics
-overall_DR<-c() #rate
-numDaysHatchToEclose<-c() #days
-hatchToIns5_DR<-c() #rate
-numDaysHatchToIns5<-c() #days
-pupation<-c() #days
-critical_period<-c() #days
-numDaysHatchtoPup <- c() #days
-hatch_ins2 <- c()
-ins2_ins3 <- c()
-ins3_ins4 <- c()
-ins4_ins5 <- c()
-
-
-for(i in 1:length(larvae_ids))
-{
-  larvaData<-ddata.tidy %>% filter(LarvID==larvae_ids[i])
-  # stages per day, all stages from Hatch to Eclose (or last stage reached)
-  #overall_DR[i]<- 1/coef(lm(stageNum~date,data=larvaData))[2] 
-  
-  # days from hatch to eclosure
-  numDaysHatchToEclose[i]<-larvaData$date[larvaData$stage=="EcloseDate"]-larvaData$date[larvaData$stage=="HatchDate"]
-  
-  # stages from Hatch to 5th instar (or last stage reached)
-  # hatchToIns5_DR[i]<-1/coef(lm(stageNum~date,data=larvaData %>% filter(stageNum<5)))[2] 
-  
-  # days from hatching to 5th instar
-  numDaysHatchToIns5[i]<-larvaData$date[larvaData$stage=="Ins5"]-larvaData$date[larvaData$stage=="HatchDate"]
-  
-  #duration of pupation
-  pupation[i]<-larvaData$date[larvaData$stage=="EcloseDate"]-larvaData$date[larvaData$stage=="PupDate"]
-  
-  #Period from 5th instar to pupa
-  critical_period[i]<-larvaData$date[larvaData$stage=="PupDate"]-larvaData$date[larvaData$stage=="Ins5"]
-  
-  #Hatch through pupation
-  numDaysHatchtoPup[i] <- larvaData$date[larvaData$stage=="PupDate"]-larvaData$date[larvaData$stage=="HatchDate"]
-  
-  #Instar moults
-  hatch_ins2[i] <- larvaData$date[larvaData$stage=="Ins2"]-larvaData$date[larvaData$stage=="HatchDate"]
-  ins2_ins3[i] <- ins2_ins3[i] <- larvaData$date[larvaData$stage=="Ins3"]-larvaData$date[larvaData$stage=="Ins2"]
-  ins3_ins4[i] <- ins3_ins4[i] <- larvaData$date[larvaData$stage=="Ins4"]-larvaData$date[larvaData$stage=="Ins3"]
-  ins4_ins5[i] <- ins4_ins5[i] <- larvaData$date[larvaData$stage=="Ins5"]-larvaData$date[larvaData$stage=="Ins4"]
-  
-}
-
-df<-data.frame(LarvID=larvae_ids,numDaysHatchToEclose=numDaysHatchToEclose,numDaysHatchToIns5=numDaysHatchToIns5,hatch_ins2 <-hatch_ins2, ins2_ins3=ins2_ins3, ins3_ins4=ins3_ins4, ins4_ins5=ins4_ins5, critical_period=critical_period, pupation=pupation, numDaysHatchtoPup=numDaysHatchtoPup)
-
-#put back into original data, remove comments column
-ddata<-left_join(ddata,df,by="LarvID")
-```
 
 ```{r regressing development metrics against predictor variables}
 
-summary(lm(overall_DR~Diet+Sex+Infection,data=ddata))
 summary(lm(hatchToIns5_DR~Diet+Sex+Infection,data=ddata))
 summary(lm(numDaysHatchToIns5~Diet+Sex+Infection, data=ddata))
 summary(lm(pupation~Diet+Sex+Infection,data=ddata))
@@ -123,32 +24,6 @@ summary(lm(numDaysHatchtoPup~Diet+Sex+Infection, data=ddata))
 
 ```
 
-```{r Merging data frames for further regressions}
-
-#change column name from 'LarvID' to 'specimen' in 'df' dataframe in order to merge dataframes by specimen
-names(ddata)[names(ddata)=="LarvID"] <- "specimen"
-names(dietcolor1)[names(dietcolor1)=="Specimen"] <- "specimen"
-#Merge dataframes -- morph and color with development rate
-totaldata <- merge(dietmorph2,dietcolor1, by="specimen")
-totaldata1 <- merge(totaldata,ddata, by="specimen")
-
-#Removing duplicate or unnecessary columns
-totaldata1$Diet.x <- NULL
-totaldata1$Diet.y <- NULL
-totaldata1$Sex.x <- NULL
-totaldata1$Sex.y <- NULL
-totaldata1$FamLine <- NULL
-totaldata1$Famline <- NULL
-totaldata1$Infection.x <- NULL
-totaldata1$Infection.y <- NULL
-totaldata1$X <- NULL
-totaldata1$Dead <- NULL
-
-totaldata1_pivot<-totaldata1 %>% pivot_longer(c("hatch_ins2....hatch_ins2","ins2_ins3" ,"ins3_ins4" ,"ins4_ins5","critical_period", "pupation"),names_to="stage_transition",values_to="duration")
-totaldata1_pivot$stage_transition<-factor(totaldata1_pivot$stage_transition,levels=c("hatch_ins2....hatch_ins2","ins2_ins3","ins3_ins4","ins4_ins5","critical_period", "pupation"))
-
-#This file contains all relevant morphological, pigmentation, and development data
-```
 
 ```{r development plots} 
 
@@ -159,18 +34,34 @@ ggplot(data=ddata.tidy %>% filter(LarvID==17),aes(x=date,y=stage))+geom_point()+
 overallDRplot <- ggplot(data=ddata.tidy,aes(x=date,y=stage,group=Diet,color=factor(Diet),fill=factor(Diet)))+
  geom_smooth(aes(y=stage),se=TRUE) 
 
-total_larvaltime <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="PupDate"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
-  geom_smooth(aes(y=stage), method="lm", se=TRUE)
+total_development <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="EcloseDate"), aes(x=date,y=stage, group=Diet,color=factor(Diet), fill=factor(Diet))) +
+  geom_smooth(aes(y=stage), method="lm", se=TRUE) +
+  labs(x="Date", y="Stage", title="Development Time from Hatching through Eclosure")
 
+#Boxplot for host plant species v. overall development rate/days to development
+DRcomparisonplot <- ggboxplot(ddata, x="Diet", y="numDaysHatchToEclose", fill="lightblue") +
+labs(y="Overall Development Rate", x = "Host Plant Species") + 
+ggtitle("Number of days") +
+theme_minimal() +
+scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
+stat_compare_means(method="anova")
+print(DRcomparisonplot)
 
 # stacked bar chart
-totaldvlpbar<-ggplot(data=totaldata1_pivot%>% group_by(diet,stage_transition) %>% summarize(mean_duration=mean(duration,na.rm=T)),
+totaldvlpbar<-ggplot(data=totaldata1_pivot%>% group_by(diet, stage_transition) %>% summarize(mean_duration=mean(duration,na.rm=T)),
        aes(x=diet,y=mean_duration,fill=stage_transition)) + 
   geom_bar(position=position_stack(reverse=T),stat="identity") +
-  labs(x="Diet", y="Number of days", title="Time spent in each larval development stage") +
+  labs(x="Diet", y="Number of days", title = "Time spent in each larval development stage") +
   scale_fill_discrete(name="Stage", breaks=c("hatch_ins2....hatch_ins2", "ins2_ins3", "ins3_ins4", "ins4_ins5", "critical_period", "pupation"), labels=c("First instar", "Second instar", "Third instar", "Fourth instar", "Fifth instar", "Pupation"))
 
-#Transition rates
+#stacked bar chart accounting for sex instead of diet
+totaldvlpsexbar<-ggplot(data=totaldata1_pivot%>% group_by(sex, stage_transition) %>% summarize(mean_duration=mean(duration,na.rm=T)),
+       aes(x=sex,y=mean_duration,fill=stage_transition)) + 
+  geom_bar(position=position_stack(reverse=T),stat="identity") +
+  labs(x="Diet", y="Number of days", title = "Time spent in each larval development stage") +
+  scale_fill_discrete(name="Stage", breaks=c("hatch_ins2....hatch_ins2", "ins2_ins3", "ins3_ins4", "ins4_ins5", "critical_period", "pupation"), labels=c("First instar", "Second instar", "Third instar", "Fourth instar", "Fifth instar", "Pupation"))
+
+#Transition rates for each larval stage
 hatch_ins2plot <- ggplot(ddata.tidy %>% filter(stage == "HatchDate" | stage=="Ins2"), aes(x=date,y=stage,group=Diet,color=factor(Diet), fill=factor(Diet))) +
   geom_smooth(aes(y=stage), method="lm", se=TRUE)
 print(hatch_ins2plot)
@@ -192,50 +83,169 @@ pupationplot <- ggplot(data=ddata.tidy %>% filter(stage == "Ins5" | stage== "Pup
 
 ```
 
-```{r development rate regression plots}
+```{r development MANCOVA + group means}
 
-#Plots for host plant species v. overall development rate/days to development
-DRcomparisonplot <- ggboxplot(ddata, x="Diet", y="numDaysHatchToEclose", fill="lightblue") +
-labs(y="Overall Development Rate", x = "Host Plant Species") + 
-ggtitle("Effects of host plant species on development rate") +
-theme_minimal() +
-scale_x_discrete(labels=c("N"="Native", "T"="Tropical")) +
-stat_compare_means(method="anova")
-print(DRcomparisonplot)
+group_by(totaldata1, sex, diet) %>%
+  summarise(count=n(), mean=mean(numDaysHatchToEclose, na.rm=TRUE), sd=sd(numDaysHatchToEclose, na.rm=TRUE))
 
- 
+group_by(totaldata1, sex, diet) %>%
+  summarise(count=n(), mean=mean(critical_period, na.rm=TRUE), sd=sd(critical_period, na.rm=TRUE))
 
+#Male overall development rate ~ diet * infection
+y_ODRm <- cbind(maledata$hatch_ins2....hatch_ins2, maledata$ins2_ins3, maledata$ins3_ins4, maledata$ins4_ins5, maledata$critical_period, maledata$pupation)
+fity_ODRm <- manova(y_ODRm ~ diet*infection, data=maledata)
+summary.aov(fity_ODRm)
+
+#Female overall development rate ~ diet * infection
+y_ODRf <- cbind(femaledata$hatch_ins2....hatch_ins2, femaledata$ins2_ins3, femaledata$ins3_ins4, femaledata$ins4_ins5, femaledata$critical_period, femaledata$pupation)
+fity_ODRf <- manova(y_ODRf ~ diet*infection, data=femaledata)
+summary.aov(fity_ODRf)
 ```
 
-```{r development/morph regressions}
+```{r MANCOVA development ~ morph/pigmentation}
+#MANCOVA for pigmentation~ numDaysHatchto Eclose
+yODRcm <- cbind(maledata$Redhue, maledata$Redsat, maledata$Redint, maledata$percent.mel, maledata$Blkdens)
+fityODRcm <- manova(yODRcm ~ numDaysHatchToEclose, data=maledata)
+summary.aov(fityODRcm)
 
-#USE TOTALDATA1 DATA FILE
-totaldata1new <- na.omit(totaldata1)
+yODRcf <- cbind(femaledata$Redhue, femaledata$Redsat, femaledata$Redint, femaledata$percent.mel, femaledata$Blkdens)
+fityODRcf <- manova(yODRcf ~ numDaysHatchToEclose + critical_period, data=femaledata)
+summary.aov(fityODRcf)
 
+#ANOVAs and plots for forewing morphology
+options(contrasts=c("contr.helmert", "contr.poly"))
 d1 <- lm(fore.area~numDaysHatchToEclose, data=totaldata1)
 d1aov <- aov(d1, type="marginal", data=totaldata1)
 anova(d1aov)
+coef(d1)
 
+d1l <-lm(fore.length~numDaysHatchToEclose, data=totaldata1)
+d1laov <- aov(d1l, type="marginal", data=totaldata1)
+anova(d1laov)
+coef(d1l)
+
+d1w <-lm(fore.width~numDaysHatchToEclose, data=totaldata1)
+d1waov <- aov(d1w, type="marginal", data=totaldata1)
+anova(d1waov)
+coef(d1w)
+
+
+#Forewing Plots w/o diet
 d1plot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=fore.area)) +
-  geom_smooth(method="lm") 
-print(d1plot)
+  geom_smooth(method="lm") +
+  geom_point(aes(color=factor(diet))) +
+  geom_errorbar(aes(ymin=)) +
+  stat_cor() +
+  labs(x=NULL, y="Forewing Area (cm sq.)")
 
+d1lplot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=fore.length)) +
+  geom_smooth(method="lm") +
+  stat_cor() +
+  labs(x=NULL, y="Forewing Length (cm)")
+
+d1wplot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=fore.width)) +
+  geom_smooth(method="lm") +
+  stat_cor() +
+  labs(x=NULL, y="Forewing Width (cm)")
+
+ggarrange(d1plot, d1lplot, d1wplot, labels=c("A", "B", "C"), ncol=2, nrow=2)
+
+
+#ANOVAs for hindwings 
+
+
+#Hindwing Plots
 d2 <- lm(hind.area~numDaysHatchToEclose, data=totaldata1)
 d2aov <- aov(d2, type="marginal", data=totaldata1)
 anova(d2aov)
+coef(d2)
 
-d2plot <-ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=hind.area)) +
-  geom_smooth(method="lm") 
+d2l <-lm(hind.length~numDaysHatchToEclose, data=totaldata1)
+d2laov <- aov(d2l, type="marginal", data=totaldata1)
+anova(d2laov)
+coef(d2l)
+
+d2w <- lm(hind.width~numDaysHatchToEclose, data=totaldata1)
+d2waov <- aov(d2w, type="marginal", data=totaldata1)
+anova(d2waov)
+coef(d2w)
+
+d2plot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=hind.area, color=factor(diet))) +
+  geom_smooth(method="lm") +
+  geom_point() +
+  stat_cor() +
+  labs(x="Development Time (# of Days)", y="Hindwing Area")
 print(d2plot)
 
-d3 <- lm(Melarea~numDaysHatchToEclose, data=totaldata1)
+d3 <- lm(percent.mel~numDaysHatchToEclose, data=totaldata1)
 d3aov <- aov(d3, type="marginal", data=totaldata1)
 anova(d3aov)
+coef(d3)
 
-d3plot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=Melarea)) +
-  geom_smooth(method="lm")
+d3plot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=percent.mel)) +
+  geom_smooth(method="lm") +
+  geom_point() +
+  stat_cor() +
+  labs(x="Development Time (# of Days)", y="Percentage of Melanin")
 print(d3plot)
 
+d4plot <-ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=Redhue, color=factor(diet))) +
+  geom_smooth(method="lm") +
+  geom_point() +
+  stat_cor() +
+  labs(x="Development Time (# of Days)", y="Red Hue")
+print(d4plot)
+
+d4satplot <- ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=Redsat)) +
+  geom_smooth(method="lm") +
+  geom_point() +
+  stat_cor() +
+  labs(x="Development Time (# of Days)", y="Red Saturation")
+
+d5plot <-ggplot(totaldata1, aes(x=numDaysHatchToEclose, y=hind.area.asym)) +
+  geom_smooth(method="lm") +
+  geom_point() +
+  stat_cor() +
+  labs(x="Development Time (# of Days)", y="Asym")
+print(d5plot)
+
+#Forewing morph ~ dvlpmt MANCOVA
+yfwm_m <- cbind(maledata$fore.area, maledata$fore.length, maledata$fore.width, maledata$fore.round, maledata$fore.asp.ratio)
+fit_yfwm_m <- manova(yfwm_m ~ critical_period + numDaysHatchToEclose, data=maledata)
+summary.aov(fit_yfwm_m)
+
+yfwm_f <- cbind(femaledata$fore.area, femaledata$fore.length, femaledata$fore.width, femaledata$fore.round, femaledata$fore.asp.ratio)
+fit_yfwm_f <- manova(yfwm_f ~ numDaysHatchToEclose + critical_period, data=femaledata)
+summary.aov(fit_yfwm_f)
+
+#Hindwing morph ~ dvlpmt MANCOVA
+yhwm_m <- cbind(maledata$hind.length, maledata$hind.width, maledata$hind.area)
+fit_yhwm_m <- manova(yhwm_m ~ numDaysHatchToEclose + critical_period, data=maledata)
+summary.aov(fit_yhwm_m)
+
+yhwm_f <- cbind(femaledata$hind.length, femaledata$hind.width, femaledata$hind.area)
+fit_yhwm_f <- manova(yhwm_f ~ numDaysHatchToEclose + critical_period, data=femaledata)
+summary.aov(fit_yhwm_f)
+
+#NOT divided by sex FW
+yfw <- cbind(totaldata1$fore.area, totaldata1$fore.length, totaldata1$fore.width, totaldata1$fore.asp.ratio, totaldata1$fore.round)
+fit_yfw <- manova(yfw ~ numDaysHatchToEclose + critical_period, data=totaldata1)
+summary.aov(fit_yfw)
+
+#NOT divided by sex HW
+yhw <- cbind(totaldata1$hind.area, totaldata1$hind.length, totaldata1$hind.width)
+fit_yhw <- manova(yhw ~ numDaysHatchToEclose + critical_period, data=totaldata1)
+summary.aov(fit_yhw)
+
+#Asym
+y_asym <- cbind(totaldata1$fore.area.asym, totaldata1$fore.length.asym, totaldata1$hind.area.asym, totaldata1$hind.length.asym)
+fity_asym <- manova(y_asym ~ numDaysHatchToEclose + critical_period, data=totaldata1)
+summary.aov(fity_asym)
+
+#Pigmentation
+y_pig <- cbind(totaldata1$Redhue, totaldata1$Redsat, totaldata1$Redint, totaldata1$percent.mel, totaldata1$Blkdens)
+fity_pig <- manova(y_pig ~ numDaysHatchToEclose + critical_period, data=totaldata1)
+summary.aov(fity_pig)
 
 ```
 
